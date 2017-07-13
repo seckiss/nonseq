@@ -67,6 +67,15 @@ func (g *Generator) Next() (seqid uint64, nonseqid []byte, err error) {
 	return seqid, nonseqid, nil
 }
 
-func (g *Generator) Decode(nonseqid uint64) (seqid uint64, err error) {
-	return 0, nil
+func (g *Generator) Decode(nonseqid []byte) (seqid uint64, err error) {
+	if len(nonseqid) != g.cipher.BlockSize() {
+		return 0, fmt.Errorf("Wrong length of nonseqid. Actual=%d, Expected=%d", len(nonseqid), g.cipher.BlockSize())
+	}
+	block := make([]byte, g.cipher.BlockSize())
+	g.cipher.Decrypt(block, nonseqid)
+	b8 := make([]byte, 8)
+	copy(b8[(8-len(block)):], block)
+	seqid = binary.BigEndian.Uint64(b8)
+	return seqid, nil
+
 }
