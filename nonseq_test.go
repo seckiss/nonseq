@@ -1,9 +1,6 @@
 package nonseq
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestGenNext4(t *testing.T) {
 	testGenNext(t, 4)
@@ -85,7 +82,7 @@ func TestB58GenNext22(t *testing.T) {
 func testB58GenNext(t *testing.T, next func() (uint64, string, error)) {
 	for i := 0; i < 10; i++ {
 		seqid, cram, err := next()
-		fmt.Printf("seqid=%d, cram=%v, err=%v\n", seqid, cram, err)
+		//fmt.Printf("seqid=%d, cram=%v, err=%v\n", seqid, cram, err)
 		_ = seqid
 		_ = cram
 		_ = err
@@ -139,6 +136,26 @@ func TestDecode4(t *testing.T) {
 	}
 }
 
+func TestDecode16(t *testing.T) {
+	inp, want := []byte{125, 208, 230, 122, 142, 71, 90, 182, 17, 57, 26, 155, 164, 15, 142, 27}, uint64(3)
+	got, err := testDecode(t, inp)
+	if err != nil {
+		t.Fatalf("got error %v", err)
+	}
+	if got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestDecode16Alien(t *testing.T) {
+	inp := []byte("abcdefghijklmnop")
+	got, err := testDecode(t, inp)
+	//fmt.Printf("alien got %v, err %v\n", got, err)
+	if err == nil {
+		t.Fatalf("got error nil while expected alien error for inp %v, got %v", inp, got)
+	}
+}
+
 func TestB58Decode6(t *testing.T) {
 	inp, want := "4xnru9", uint64(3)
 	got, err := testB58Decode(t, inp)
@@ -147,5 +164,25 @@ func TestB58Decode6(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestB58Decode22(t *testing.T) {
+	inp, want := "GY77Ckyvo9eHPcpPoZpvRY", uint64(3)
+	got, err := testB58Decode(t, inp)
+	if err != nil {
+		t.Fatalf("got error %v", err)
+	}
+	if got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestB58Decode22Alien(t *testing.T) {
+	inp := "1234512345123451234512"
+	got, err := testB58Decode(t, inp)
+	//fmt.Printf("alien got %v, err %v\n", got, err)
+	if err == nil {
+		t.Fatalf("got error nil while expected alien error for inp %v, got %v", inp, got)
 	}
 }
