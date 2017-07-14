@@ -79,8 +79,8 @@ func isZeroSlice(b []byte) bool {
 	return true
 }
 
-// convert uint64 into []byte
-// return error if given uint64 id exceeds maximum number encodable in size bytes
+// Convert uint64 into []byte
+// Also for size < 8 return error if given uint64 id exceeds maximum number encodable in size bytes
 func toBytes(id uint64, size int) ([]byte, error) {
 	b8 := make([]byte, 8)
 	binary.BigEndian.PutUint64(b8, id)
@@ -100,15 +100,21 @@ func toBytes(id uint64, size int) ([]byte, error) {
 	}
 }
 
-func fromBytes(b []byte) uint64 {
+// Convert []byte to uint64
+// Also for len(b) > 8 return error if the trimmed MSB bytes are non-zero
+// It may work as a correctness checksum for 12 and 16 byte blocksize
+func fromBytes(b []byte) (id uint64, err error) {
 	size := len(b)
 	b8 := make([]byte, 8)
 	if size < 8 {
 		copy(b8[(8-size):], b)
 	} else if size >= 8 {
 		copy(b8, b[(size-8):])
+		if !isZeroSlice(b[0:(size - 8)]) {
+			err = fmt.Errorf("Trimmed MSB bytes are non-zero in %v", b)
+		}
 	}
-	return binary.BigEndian.Uint64(b8)
+	return binary.BigEndian.Uint64(b8), err
 }
 
 func (g *Generator) Decode(nonseqid []byte) (seqid uint64, err error) {
@@ -119,6 +125,10 @@ func (g *Generator) Decode(nonseqid []byte) (seqid uint64, err error) {
 	}
 	block := make([]byte, blocksize)
 	c.Decrypt(block, nonseqid)
-	seqid = fromBytes(block)
-	return seqid, nil
+	seqid, err = fromBytes(block)
+	// rewrite error to be more informative
+	if err != nil {
+		err = fmt.Errorf("The nonseq %v is decodable but does not come from this generator", nonseqid)
+	}
+	return seqid, err
 }
