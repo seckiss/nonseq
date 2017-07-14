@@ -1,6 +1,6 @@
 package nonseq
 
-// Generate non-sequential unique IDs from a serial uint64 sequence (like from Postgres bigserial sequence)
+// Generate non-sequential unique IDs from a serial uint64 sequence (like from Postgres bigserial sequence or from a simple non-durable counter)
 
 import (
 	"encoding/binary"
