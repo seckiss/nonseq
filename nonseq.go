@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/crowsonkb/base58"
+
 	"github.com/ankitkalbande/simonspeck"
 )
 
@@ -130,5 +132,54 @@ func (g *Generator) Decode(nonseqid []byte) (seqid uint64, err error) {
 	if err != nil {
 		err = fmt.Errorf("The nonseq %v is decodable but does not come from this generator", nonseqid)
 	}
+	return seqid, err
+}
+
+type B58Generator Generator
+
+func NewB58Generator(key []byte, seq func() (seqid uint64, err error)) *B58Generator {
+	g := NewGenerator(key, seq)
+	return (*B58Generator)(g)
+}
+
+// 6-char cram from 32-bit Speck
+func (g *B58Generator) Next6() (seqid uint64, cram string, err error) {
+	return g.nextN(4)
+}
+
+// 9-char cram from 48-bit Speck
+func (g *B58Generator) Next9() (seqid uint64, cram string, err error) {
+	return g.nextN(6)
+}
+
+// 11-char cram from 64-bit Speck
+func (g *B58Generator) Next11() (seqid uint64, cram string, err error) {
+	return g.nextN(8)
+}
+
+// 17-char cram from 96-bit Speck
+func (g *B58Generator) Next17() (seqid uint64, cram string, err error) {
+	return g.nextN(12)
+}
+
+// 22-char cram from 128-bit Speck
+func (g *B58Generator) Next22() (seqid uint64, cram string, err error) {
+	return g.nextN(16)
+}
+
+func (g *B58Generator) nextN(blocksize int) (seqid uint64, cram string, err error) {
+	nonseqid := make([]byte, blocksize)
+	seqid, err = (*Generator)(g).Next(nonseqid)
+	// on error encode anyway
+	cram = base58.Fixed.Encode(nonseqid)
+	return seqid, cram, err
+}
+
+func (g *B58Generator) Decode(cram string) (seqid uint64, err error) {
+	nonseqid, err := base58.Fixed.Decode(cram)
+	if err != nil {
+		return 0, err
+	}
+	seqid, err = (*Generator)(g).Decode(nonseqid)
 	return seqid, err
 }
