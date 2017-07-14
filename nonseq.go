@@ -9,15 +9,12 @@ import (
 	"github.com/ankitkalbande/simonspeck"
 )
 
-// Simon/Speck cipher key size mapping to block size. There are many variants
-// Block size/key length in bits:
+// Simon/Speck cipher block size/key length in bits:
 // - 32/64
 // - 48/72, 48/96
 // - 64/96, 64/128
 // - 96/96, 96/144
 // - 128/128, 128/192, 128/256
-// We chose 32/64, 48/72 and 64/96 which corresponds to the reversed mapping in bytes:
-var keylen2blocksize = map[int]int{8: 4, 9: 6, 12: 8}
 
 // missing interface in simonspec library
 type SimonSpeckCipher interface {
@@ -25,6 +22,10 @@ type SimonSpeckCipher interface {
 	Decrypt(dst, src []byte)
 	BlockSize() int
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Binary Generator
+////////////////////////////////////////////////////////////////////////////////
 
 type Generator struct {
 	key []byte
@@ -70,6 +71,22 @@ func (g *Generator) Next(nonseqid []byte) (seqid uint64, err error) {
 	}
 	c.Encrypt(nonseqid, bytes)
 	return seqid, nil
+}
+
+func (g *Generator) Decode(nonseqid []byte) (seqid uint64, err error) {
+	blocksize := len(nonseqid)
+	c := g.cipher[blocksize]
+	if c == nil {
+		return 0, fmt.Errorf("Block size should be 4, 6, 8, 12 or 16 bytes")
+	}
+	block := make([]byte, blocksize)
+	c.Decrypt(block, nonseqid)
+	seqid, err = fromBytes(block)
+	// rewrite error to be more informative
+	if err != nil {
+		err = fmt.Errorf("The nonseq %v is decodable but does not come from this generator", nonseqid)
+	}
+	return seqid, err
 }
 
 func isZeroSlice(b []byte) bool {
@@ -119,21 +136,9 @@ func fromBytes(b []byte) (id uint64, err error) {
 	return binary.BigEndian.Uint64(b8), err
 }
 
-func (g *Generator) Decode(nonseqid []byte) (seqid uint64, err error) {
-	blocksize := len(nonseqid)
-	c := g.cipher[blocksize]
-	if c == nil {
-		return 0, fmt.Errorf("Block size should be 4, 6, 8, 12 or 16 bytes")
-	}
-	block := make([]byte, blocksize)
-	c.Decrypt(block, nonseqid)
-	seqid, err = fromBytes(block)
-	// rewrite error to be more informative
-	if err != nil {
-		err = fmt.Errorf("The nonseq %v is decodable but does not come from this generator", nonseqid)
-	}
-	return seqid, err
-}
+////////////////////////////////////////////////////////////////////////////////
+// Base58 Generator
+////////////////////////////////////////////////////////////////////////////////
 
 type B58Generator Generator
 
