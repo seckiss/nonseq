@@ -40,12 +40,20 @@ func getGenerator() *Generator {
 	return NewGenerator(key, seq)
 }
 
-/*
-func TestDecode8(t *testing.T) {
+func testDecode(t *testing.T, nonseqid []byte) (seqid uint64, err error) {
 	gen := getGenerator()
-	nonseqid := []byte{42, 5, 18, 59}
-	seqid, err := gen.Decode(nonseqid)
+	seqid, err = gen.Decode(nonseqid)
 	fmt.Printf("seqid=%d, err=%v\n", seqid, err)
-
+	return seqid, err
 }
-*/
+
+func TestDecode4(t *testing.T) {
+	inp, want := []byte{154, 255, 88, 12}, uint64(3)
+	got, err := testDecode(t, inp)
+	if err != nil {
+		t.Fatalf("got error %v", err)
+	}
+	if got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
