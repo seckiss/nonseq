@@ -1,5 +1,7 @@
 package nonseq
 
+// Generate non-sequential unique IDs from a serial uint64 sequence (like from Postgres bigserial sequence)
+
 import (
 	"encoding/binary"
 	"fmt"
@@ -16,7 +18,7 @@ import (
 // - 96/96, 96/144
 // - 128/128, 128/192, 128/256
 
-// missing interface in simonspec library
+// missing interface in simonspeck library
 type SimonSpeckCipher interface {
 	Encrypt(dst, src []byte)
 	Decrypt(dst, src []byte)
