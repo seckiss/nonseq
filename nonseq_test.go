@@ -186,3 +186,23 @@ func TestB58Decode22Alien(t *testing.T) {
 		t.Fatalf("got error nil while expected alien error for inp %v, got %v", inp, got)
 	}
 }
+
+func getB64Generator() *B64Generator {
+	var counter uint64
+	seq := func() (uint64, error) {
+		counter++
+		return counter, nil
+	}
+	return NewB64Generator(getKey(), seq)
+}
+
+func TestB64GenNext(t *testing.T) {
+	gen := getB64Generator()
+	for i := 0; i < 10; i++ {
+		seqid, cram, err := gen.Next()
+		//fmt.Printf("seqid=%d, cram=%v, err=%v\n", seqid, cram, err)
+		_ = seqid
+		_ = cram
+		_ = err
+	}
+}

@@ -3,8 +3,10 @@ package nonseq
 // Generate non-sequential unique IDs from a serial uint64 sequence (like from Postgres bigserial sequence or from a simple non-durable counter)
 
 import (
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"strings"
 
 	"github.com/crowsonkb/base58"
 
@@ -184,6 +186,49 @@ func (g *B58Generator) nextN(blocksize int) (seqid uint64, cram string, err erro
 
 func (g *B58Generator) Decode(cram string) (seqid uint64, err error) {
 	nonseqid, err := base58.Fixed.Decode(cram)
+	if err != nil {
+		return 0, err
+	}
+	seqid, err = (*Generator)(g).Decode(nonseqid)
+	return seqid, err
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Selective Base64 Generator
+// To generate single ID it may call seq() many times because the outputs with
+// non-alphanumeric chars are rejected
+// The advantage of this scheme is good compression specifically
+// 48-bit may be encoded in 8 chars
+// (base58 needs 9 chars)
+////////////////////////////////////////////////////////////////////////////////
+
+type B64Generator Generator
+
+func NewB64Generator(key []byte, seq func() (seqid uint64, err error)) *B64Generator {
+	g := NewGenerator(key, seq)
+	return (*B64Generator)(g)
+}
+
+// 8-char cram from 48-bit Speck
+func (g *B64Generator) Next() (seqid uint64, cram string, err error) {
+	nonseqid := make([]byte, 6)
+	for {
+		seqid, err = (*Generator)(g).Next(nonseqid)
+		// on error encode anyway
+		cram = base64.URLEncoding.EncodeToString(nonseqid)
+		if !strings.ContainsAny(cram, "-_") {
+			break
+		}
+	}
+	return seqid, cram, err
+}
+
+// decode 8-char cram into 8-byte seqid uint64
+func (g *B64Generator) Decode(cram string) (seqid uint64, err error) {
+	if len(cram) != 8 || strings.ContainsAny(cram, "-_") {
+		return 0, fmt.Errorf("B64Generator can only decode 8-char alphanumeric cram")
+	}
+	nonseqid, err := base64.URLEncoding.DecodeString(cram)
 	if err != nil {
 		return 0, err
 	}
