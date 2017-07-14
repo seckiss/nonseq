@@ -25,57 +25,83 @@ type SimonSpeckCipher interface {
 }
 
 type Generator struct {
-	key    []byte
-	cipher SimonSpeckCipher
+	key []byte
+	// block size to corresponding cipher mapping
+	cipher map[int]SimonSpeckCipher
 	seq    func() (seqid uint64, err error)
 }
 
 // Secret key ensures a unique permutation of the input sequence, so that only someone who knows the key can guess nonseqid value
-// Key length determines block size and by this the number of significant bits in returned nonseqid (also its max value).
-func NewGenerator(key []byte, seq func() (seqid uint64, err error)) (*Generator, error) {
-	var cipher SimonSpeckCipher
-	if blocksize, pres := keylen2blocksize[len(key)]; pres {
-		if blocksize == 4 {
-			cipher = simonspeck.NewSpeck32(key)
-		} else if blocksize == 6 {
-			cipher = simonspeck.NewSpeck48(key)
-		} else if blocksize == 8 {
-			cipher = simonspeck.NewSpeck64(key)
-		} else {
-			// should not happen
-			return nil, fmt.Errorf("Internal error. Blocksize is %d", blocksize)
-		}
-		return &Generator{key, cipher, seq}, nil
-	} else {
-		return nil, fmt.Errorf("Allowed key length is 8, 9 or 12 bytes")
+// The key should be 16 bytes however only part of it is used for weaker ciphers
+func NewGenerator(key []byte, seq func() (seqid uint64, err error)) *Generator {
+	if len(key) != 16 {
+		// wrong key length means developer error
+		panic("Key length should be 16 bytes")
 	}
+	g := &Generator{key, make(map[int]SimonSpeckCipher), seq}
+	g.cipher[4] = simonspeck.NewSpeck32(key[:8])
+	g.cipher[6] = simonspeck.NewSpeck48(key[:9])
+	g.cipher[8] = simonspeck.NewSpeck64(key[:12])
+	g.cipher[12] = simonspeck.NewSpeck96(key[:12])
+	g.cipher[16] = simonspeck.NewSpeck128(key)
+	return g
 }
 
-// nonseqid is []byte of blocksize length (4, 6 or 8 bytes)
-func (g *Generator) Next() (seqid uint64, nonseqid []byte, err error) {
+// nonseqid is []byte of blocksize length (4, 6, 8, 12 or 16)
+// it will be filled with nonseqid generated from seqid which is also returned
+func (g *Generator) Next(nonseqid []byte) (seqid uint64, err error) {
+	blocksize := len(nonseqid)
+	c := g.cipher[blocksize]
+	if c == nil {
+		// wrong block size means developer error
+		panic("Block size should be 4, 6, 8, 12 or 16 bytes")
+	}
 	seqid, err = g.seq()
 	// propagate the source sequence error
 	if err != nil {
-		return 0, nil, err
+		return 0, err
 	}
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, seqid)
-	// trim b to blocksize
-	b = b[(8 - g.cipher.BlockSize()):]
-	nonseqid = make([]byte, g.cipher.BlockSize())
-	g.cipher.Encrypt(nonseqid, b)
-	return seqid, nonseqid, nil
+	// convert seqid to []byte of same length as nonseqid
+	bytes := toBytes(seqid, blocksize)
+	c.Encrypt(nonseqid, bytes)
+	return seqid, nil
+}
+
+func toBytes(id uint64, size int) []byte {
+	b8 := make([]byte, 8)
+	binary.BigEndian.PutUint64(b8, id)
+	if size < 8 {
+		// trim to blocksize
+		return b8[(8 - size):]
+	} else if size > 8 {
+		// expand to blocksize
+		bytes := make([]byte, size)
+		copy(bytes[(size-8):], b8)
+		return bytes
+	} else {
+		return b8
+	}
+}
+
+func fromBytes(b []byte) uint64 {
+	size := len(b)
+	b8 := make([]byte, 8)
+	if size < 8 {
+		copy(b8[(8-size):], b)
+	} else if size >= 8 {
+		copy(b8, b[(size-8):])
+	}
+	return binary.BigEndian.Uint64(b8)
 }
 
 func (g *Generator) Decode(nonseqid []byte) (seqid uint64, err error) {
-	if len(nonseqid) != g.cipher.BlockSize() {
-		return 0, fmt.Errorf("Wrong length of nonseqid. Actual=%d, Expected=%d", len(nonseqid), g.cipher.BlockSize())
+	blocksize := len(nonseqid)
+	c := g.cipher[blocksize]
+	if c == nil {
+		return 0, fmt.Errorf("Block size should be 4, 6, 8, 12 or 16 bytes")
 	}
-	block := make([]byte, g.cipher.BlockSize())
-	g.cipher.Decrypt(block, nonseqid)
-	b8 := make([]byte, 8)
-	copy(b8[(8-len(block)):], block)
-	seqid = binary.BigEndian.Uint64(b8)
+	block := make([]byte, blocksize)
+	c.Decrypt(block, nonseqid)
+	seqid = fromBytes(block)
 	return seqid, nil
-
 }
