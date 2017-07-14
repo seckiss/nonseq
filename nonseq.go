@@ -62,24 +62,41 @@ func (g *Generator) Next(nonseqid []byte) (seqid uint64, err error) {
 		return 0, err
 	}
 	// convert seqid to []byte of same length as nonseqid
-	bytes := toBytes(seqid, blocksize)
+	bytes, err := toBytes(seqid, blocksize)
+	if err != nil {
+		return seqid, err
+	}
 	c.Encrypt(nonseqid, bytes)
 	return seqid, nil
 }
 
-func toBytes(id uint64, size int) []byte {
+func isZeroSlice(b []byte) bool {
+	for _, bb := range b {
+		if bb != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// convert uint64 into []byte
+// return error if given uint64 id exceeds maximum number encodable in size bytes
+func toBytes(id uint64, size int) ([]byte, error) {
 	b8 := make([]byte, 8)
 	binary.BigEndian.PutUint64(b8, id)
 	if size < 8 {
+		if !isZeroSlice(b8[:(8 - size)]) {
+			return nil, fmt.Errorf("id %d exceeds maximum number encodeable in %d bytes", id, size)
+		}
 		// trim to blocksize
-		return b8[(8 - size):]
+		return b8[(8 - size):], nil
 	} else if size > 8 {
 		// expand to blocksize
 		bytes := make([]byte, size)
 		copy(bytes[(size-8):], b8)
-		return bytes
+		return bytes, nil
 	} else {
-		return b8
+		return b8, nil
 	}
 }
 

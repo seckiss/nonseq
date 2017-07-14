@@ -1,32 +1,60 @@
 package nonseq
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
-func TestGeneratorKey4(t *testing.T) {
-	testGenKey(t, 4)
+func TestGenNext4(t *testing.T) {
+	testGenNext(t, 4)
 }
-func TestGeneratorKey6(t *testing.T) {
-	testGenKey(t, 6)
+func TestGenNext6(t *testing.T) {
+	testGenNext(t, 6)
 }
-func TestGeneratorKey8(t *testing.T) {
-	testGenKey(t, 8)
+func TestGenNext8(t *testing.T) {
+	testGenNext(t, 8)
 }
-func TestGeneratorKey12(t *testing.T) {
-	testGenKey(t, 12)
+func TestGenNext12(t *testing.T) {
+	testGenNext(t, 12)
 }
-func TestGeneratorKey16(t *testing.T) {
-	testGenKey(t, 16)
+func TestGenNext16(t *testing.T) {
+	testGenNext(t, 16)
 }
 
-func testGenKey(t *testing.T, blocksize int) {
+func TestGenNextNotExceed4(t *testing.T) {
+	// 4 billion should not exceed 2^32
+	seq := func() (uint64, error) {
+		return 4000000000, nil
+	}
+	gen := NewGenerator(getKey(), seq)
+	blocksize := 4
+	nonseqid := make([]byte, blocksize)
+	seqid, err := gen.Next(nonseqid)
+	if err != nil {
+		t.Fatalf("got error: %v, expected nil for seqid=%v", seqid)
+	}
+}
+
+func TestGenNextExceed4(t *testing.T) {
+	// 5 billion should exceed 2^32
+	seq := func() (uint64, error) {
+		return 5000000000, nil
+	}
+	gen := NewGenerator(getKey(), seq)
+	blocksize := 4
+	nonseqid := make([]byte, blocksize)
+	seqid, err := gen.Next(nonseqid)
+	//fmt.Printf("expected error: %v\n", err)
+	if err == nil {
+		t.Fatalf("got error nil while expected error exceeding for seqid=%v", seqid)
+	}
+}
+
+func testGenNext(t *testing.T, blocksize int) {
 	gen := getGenerator()
 	for i := 0; i < 10; i++ {
 		nonseqid := make([]byte, blocksize)
-		seqid, _ := gen.Next(nonseqid)
-		fmt.Printf("seqid=%d, nonseqid=%v\n", seqid, nonseqid)
+		seqid, err := gen.Next(nonseqid)
+		//fmt.Printf("seqid=%d, nonseqid=%v, err=%v\n", seqid, nonseqid, err)
+		_ = seqid
+		_ = err
 	}
 }
 
@@ -36,14 +64,17 @@ func getGenerator() *Generator {
 		counter++
 		return counter, nil
 	}
-	key := []byte("0123456789abcdef")
-	return NewGenerator(key, seq)
+	return NewGenerator(getKey(), seq)
+}
+
+func getKey() []byte {
+	return []byte("0123456789abcdef")
 }
 
 func testDecode(t *testing.T, nonseqid []byte) (seqid uint64, err error) {
 	gen := getGenerator()
 	seqid, err = gen.Decode(nonseqid)
-	fmt.Printf("seqid=%d, err=%v\n", seqid, err)
+	//fmt.Printf("seqid=%d, err=%v\n", seqid, err)
 	return seqid, err
 }
 
