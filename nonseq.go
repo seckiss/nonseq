@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/crowsonkb/base58"
@@ -231,6 +232,79 @@ func (g *B64Generator) Decode(cram string) (seqid uint64, err error) {
 	nonseqid, err := base64.URLEncoding.DecodeString(cram)
 	if err != nil {
 		return 0, err
+	}
+	seqid, err = (*Generator)(g).Decode(nonseqid)
+	return seqid, err
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Base36 Generator
+////////////////////////////////////////////////////////////////////////////////
+
+type B36Generator Generator
+
+func NewB36Generator(key []byte, seq func() (seqid uint64, err error)) *B36Generator {
+	g := NewGenerator(key, seq)
+	return (*B36Generator)(g)
+}
+
+// 7-char cram from 32-bit Speck
+func (g *B36Generator) Next7() (seqid uint64, cram string, err error) {
+	nonseqid := make([]byte, 4)
+	seqid, err = (*Generator)(g).Next(nonseqid)
+	nonseqidpad := make([]byte, 8)
+	copy(nonseqidpad[4:], nonseqid)
+	cram = strconv.FormatUint(binary.BigEndian.Uint64(nonseqidpad), 36)
+	// pad with zeros in front
+	cram = fmt.Sprintf("%07s", cram)
+	return seqid, cram, err
+}
+
+// 10-char cram from 48-bit Speck
+func (g *B36Generator) Next10() (seqid uint64, cram string, err error) {
+	nonseqid := make([]byte, 6)
+	seqid, err = (*Generator)(g).Next(nonseqid)
+	nonseqidpad := make([]byte, 8)
+	copy(nonseqidpad[2:], nonseqid)
+	cram = strconv.FormatUint(binary.BigEndian.Uint64(nonseqidpad), 36)
+	// pad with zeros in front
+	cram = fmt.Sprintf("%010s", cram)
+	return seqid, cram, err
+}
+
+// 13-char cram from 64-bit Speck
+func (g *B36Generator) Next13() (seqid uint64, cram string, err error) {
+	nonseqid := make([]byte, 8)
+	seqid, err = (*Generator)(g).Next(nonseqid)
+	cram = strconv.FormatUint(binary.BigEndian.Uint64(nonseqid), 36)
+	// pad with zeros in front
+	cram = fmt.Sprintf("%013s", cram)
+	return seqid, cram, err
+}
+
+func (g *B36Generator) Decode(cram string) (seqid uint64, err error) {
+	var nonseqid []byte
+	u64, err := strconv.ParseUint(cram, 36, 64)
+	if err != nil {
+		return 0, err
+	}
+	if len(cram) == 7 {
+		nonseqid, err = toBytes(u64, 4)
+		if err != nil {
+			return 0, err
+		}
+	} else if len(cram) == 10 {
+		nonseqid, err = toBytes(u64, 6)
+		if err != nil {
+			return 0, err
+		}
+	} else if len(cram) == 13 {
+		nonseqid, err = toBytes(u64, 8)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		return 0, fmt.Errorf("B36Generator can only decode crams of length 7, 10 or 13")
 	}
 	seqid, err = (*Generator)(g).Decode(nonseqid)
 	return seqid, err

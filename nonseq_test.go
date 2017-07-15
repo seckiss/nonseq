@@ -1,6 +1,9 @@
 package nonseq
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestGenNext4(t *testing.T) {
 	testGenNext(t, 4)
@@ -201,6 +204,58 @@ func TestB64GenNext(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		seqid, cram, err := gen.Next()
 		//fmt.Printf("seqid=%d, cram=%v, err=%v\n", seqid, cram, err)
+		_ = seqid
+		_ = cram
+		_ = err
+	}
+}
+
+func getB36Generator() *B36Generator {
+	var counter uint64
+	seq := func() (uint64, error) {
+		counter++
+		return counter, nil
+	}
+	return NewB36Generator(getKey(), seq)
+}
+
+func TestB36GenNext7(t *testing.T) {
+	gen := getB36Generator()
+	for i := 0; i < 10; i++ {
+		seqid, cram, err := gen.Next7()
+		fmt.Printf("seqid=%d, cram=%v, err=%v\n", seqid, cram, err)
+		seqidgot, err := gen.Decode(cram)
+		if err != nil || seqid != seqidgot {
+			t.Fatalf("got %d, want %d, error: %v", seqidgot, seqid, err)
+		}
+		_ = seqid
+		_ = cram
+		_ = err
+	}
+}
+func TestB36GenNext10(t *testing.T) {
+	gen := getB36Generator()
+	for i := 0; i < 10; i++ {
+		seqid, cram, err := gen.Next10()
+		fmt.Printf("seqid=%d, cram=%v, err=%v\n", seqid, cram, err)
+		seqidgot, err := gen.Decode(cram)
+		if err != nil || seqid != seqidgot {
+			t.Fatalf("got %d, want %d, error: %v", seqidgot, seqid, err)
+		}
+		_ = seqid
+		_ = cram
+		_ = err
+	}
+}
+func TestB36GenNext13(t *testing.T) {
+	gen := getB36Generator()
+	for i := 0; i < 10; i++ {
+		seqid, cram, err := gen.Next13()
+		fmt.Printf("seqid=%d, cram=%v, err=%v\n", seqid, cram, err)
+		seqidgot, err := gen.Decode(cram)
+		if err != nil || seqid != seqidgot {
+			t.Fatalf("got %d, want %d, error: %v", seqidgot, seqid, err)
+		}
 		_ = seqid
 		_ = cram
 		_ = err
